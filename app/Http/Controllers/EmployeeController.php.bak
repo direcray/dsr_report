@@ -1,0 +1,152 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use Illuminate\Http\Request;
+use App\Employee;
+use App\Customer;
+use App\SRV;
+use App\Transaction;
+use App\OldTransaction;
+
+class EmployeeController extends Controller
+{
+    /**
+     * Display a listing of the resource.
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function index()
+    {
+        $employees = Employee::paginate(30);
+
+        return view('employee.index',compact('employees'));
+    }
+
+    /**
+     * Display a listing of the resource.
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function view($id)
+    {
+        $employee = Employee::where('EMDN', $id)->first();
+        $srv = $employee->service_records()->where('MTH', '201806')->first();
+        //$old_transaction_amount = $employee->old_transactions()->sum('UP');
+        //$old_transaction_amount = OldTransaction::select(OldTransaction::raw('SUM(`QTY`*(`UP`-`UC`)) AS `amount`'))
+        //                                            ->whereRaw("`EMDN`='$id' AND `OPT` IN (0, 1, 3)")
+        //                                            ->get();
+        $customers = $employee->customers()->where('B', '=', '0000')->get();
+        $i = 0;
+        $ac_cond = " AND `AC` in (";
+        foreach ($customers as $customer) {
+            $i ++;
+            if ($i == 1) {
+                $ac_cond .= "'". $customer->AC. "'";
+            } else {
+                $ac_cond .= ",'". $customer->AC. "'";
+            }
+            /*
+            $old_gp = OldTransaction::selectRaw("SUM(`QTY`*(`UP`-`UC`)) AS `GP`")
+                        ->whereRaw("`OPT` IN ('0', '1', '3') AND `AC`='". $customer->AC. "'")
+                        ->first();
+
+            $gp = Transaction::selectRaw("SUM(`QTY`*(`UP`-`UC`)) AS `GP`")
+                        ->whereRaw("`OPT` IN ('0', '1', '3') AND `AC`='". $customer->AC. "' AND `DATE` >= '2018-01-01'")
+                        ->first();
+            */
+            //$customer->old_gp = $old_gp;
+            //$customer->gp = $gp;
+        }
+        $ac_cond .= ")";
+
+        $old_transaction = OldTransaction::selectRaw("SUM(`QTY`*(`UP`-`UC`)) AS `GP`")
+        ->whereRaw("`OPT` IN ('0', '1', '3')" . $ac_cond)
+        ->first();
+
+        $transaction = Transaction::selectRaw("SUM(`QTY`*(`UP`-`UC`)) AS `GP`")
+        ->whereRaw("`OPT` IN ('0', '1', '3') AND `DATE` >= '2018-01-01'" . $ac_cond)
+        ->first();
+
+        $old_volume = Transaction::selectRaw("SUM(`QTY`*`LT`) AS `TLT`")
+        ->whereRaw("`OPT` IN ('0', '1', '3') AND `DATE` >= '2017-01-01' AND `DATE` <= '2017-12-31'" . $ac_cond)
+        ->first();
+
+        $volume = Transaction::selectRaw("SUM(`QTY`*`LT`) AS `TLT`")
+        ->whereRaw("`OPT` IN ('0', '1', '3') AND `DATE` >= '2018-01-01'" . $ac_cond)
+        ->first();
+
+        $old_customer_count = OldTransaction::whereRaw("`OPT` IN ('0', '1', '3')" . $ac_cond)
+        ->distinct('AC')->count('AC');
+
+        $customer_count = Transaction::whereRaw("`OPT` IN ('0', '1', '3') AND `DATE` >= '2018-01-01' " . $ac_cond)
+        ->distinct('AC')->count('AC');
+
+        $i = 1;
+
+        return view('employee.view', compact('employee', 'customers', 'srv', 'old_transaction', 'transaction', 'old_volume', 'volume', 'old_customer_count', 'customer_count', 'i'));
+//        return view('employee.view', compact('employee', 'customers', 'srv', 'transaction', 'ac_list'));
+    }
+
+    /**
+     * Display a listing of the resource.
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function dsr_report($id)
+    {
+        $employee = Employee::where('EMDN', $id)->first();
+        $srv = $employee->service_records()->where('MTH', '201806')->first();
+        $customers = $employee->customers()->where('B', '=', '0000')->get();
+        $i = 0;
+        $ac_cond = " AND `AC` in (";
+        foreach ($customers as $customer) {
+            $i ++;
+            if ($i == 1) {
+                $ac_cond .= "'". $customer->AC. "'";
+            } else {
+                $ac_cond .= ",'". $customer->AC. "'";
+            }
+        }
+        $ac_cond .= ")";
+
+        $old_transaction = OldTransaction::selectRaw("SUM(`QTY`*(`UP`-`UC`)) AS `GP`")
+        ->whereRaw("`OPT` IN ('0', '1', '3')" . $ac_cond)
+        ->first();
+
+        $transaction = Transaction::selectRaw("SUM(`QTY`*(`UP`-`UC`)) AS `GP`")
+        ->whereRaw("`OPT` IN ('0', '1', '3') AND `DATE` >= '2018-01-01'" . $ac_cond)
+        ->first();
+
+        $old_volume = Transaction::selectRaw("SUM(`QTY`*`LT`) AS `TLT`")
+        ->whereRaw("`OPT` IN ('0', '1', '3') AND `DATE` >= '2017-01-01' AND `DATE` <= '2017-12-31'" . $ac_cond)
+        ->first();
+
+        $volume = Transaction::selectRaw("SUM(`QTY`*`LT`) AS `TLT`")
+        ->whereRaw("`OPT` IN ('0', '1', '3') AND `DATE` >= '2018-01-01'" . $ac_cond)
+        ->first();
+
+        $old_customer_count = OldTransaction::whereRaw("`OPT` IN ('0', '1', '3')" . $ac_cond)
+        ->distinct('AC')->count('AC');
+
+        $customer_count = Transaction::whereRaw("`OPT` IN ('0', '1', '3') AND `DATE` >= '2018-01-01' " . $ac_cond)
+        ->distinct('AC')->count('AC');
+
+        $i = 1;
+
+        return view('employee.dsr', compact('employee', 'customers', 'srv', 'old_transaction', 'transaction', 'old_volume', 'volume', 'old_customer_count', 'customer_count', 'i'));
+    }
+
+    /**
+     * Display a listing of the resource.
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function edit_target($id)
+    {
+        $employees = Employee::paginate(30);
+
+        return view('employee.index',compact('employees'));
+    }
+
+}
